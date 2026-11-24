@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Arvi – kevyt ja nopea suomenkielinen tehtävä- ja arviointilista Androidille.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Arvi</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="26" height="26" fill="none">
+            <rect width="32" height="32" rx="9" fill="currentColor" opacity="0.14"/>
+            <path d="M9.5 16.5L14 21L22.5 11.5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Arvi</h1>
+          <span class="brand-subtitle" id="headerSummary">Ladataan…</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="icon-btn backup-indicator-btn" id="backupIndicatorBtn" title="Varmuuskopioinnin tila" aria-label="Varmuuskopioinnin tila">
+          <span class="status-dot" id="backupDot"></span>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </button>
+
+        <button type="button" class="icon-btn" id="openSettingsBtn" title="Asetukset" aria-label="Asetukset">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Permission Banner (only shown if local backup folder needs 1-tap re-confirmation) -->
+    <div class="banner banner-warning hidden" id="backupPermissionBanner" role="status">
+      <div class="banner-text">
+        <strong>Varmuuskopiokansio odottaa vahvistusta</strong>
+        <span id="backupBannerDetail">Vahvista oikeus jatkaaksesi automaattista tallennusta.</span>
+      </div>
+      <button type="button" class="btn btn-sm btn-primary" id="reauthorizeBannerBtn">Vahvista</button>
+    </div>
+
+    <!-- Install PWA Banner (shown only if browser offers native install prompt) -->
+    <div class="banner banner-info hidden" id="installBanner">
+      <div class="banner-text">
+        <strong>Asenna Arvi puhelimeen</strong>
+        <span>Toimii nopeasti ja itsenäisesti ilman verkkoyhteyttä.</span>
+      </div>
+      <div class="banner-btns">
+        <button type="button" class="btn btn-sm btn-primary" id="installPwaBtn">Asenna</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="dismissInstallBtn" aria-label="Sulje">✕</button>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-stats" id="toolbarStats"></div>
+      <button type="button" class="toggle-pill" id="toggleDoneBtn" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span id="toggleDoneLabel">Piilota tehdyt</span>
+      </button>
+    </div>
+
+    <!-- Main Task List -->
+    <main class="main-content" id="mainContent">
+      <div class="task-list" id="taskList" role="list"></div>
+
+      <div class="swipe-hint hidden" id="swipeHint">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+        </svg>
+        <span>Vinkki: Svaippaa työtä oikealle tai vasemmalle vaihtaaksesi sen tilaa.</span>
+      </div>
+
+      <section class="empty-state hidden" id="emptyState">
+        <div class="empty-illustration" aria-hidden="true">
+          <svg viewBox="0 0 96 96" width="84" height="84" fill="none">
+            <rect x="18" y="14" width="60" height="68" rx="14" stroke="currentColor" stroke-width="3" opacity="0.22"/>
+            <path d="M32 34h32M32 48h24M32 62h18" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" opacity="0.35"/>
+            <circle cx="68" cy="64" r="14" fill="var(--accent)" opacity="0.16"/>
+            <path d="M62.5 64.5L66.5 68.5L74 60" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2 id="emptyTitle">Ei vielä arvioitavia töitä</h2>
+        <p id="emptyMessage">Lisää ensimmäinen työ alakulman plus-painikkeella. Työt järjestyvät automaattisesti aikajärjestykseen.</p>
+        <button type="button" class="btn btn-primary" id="emptyAddBtn">+ Lisää työ</button>
+      </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button type="button" class="fab" id="addTaskFab" aria-label="Lisää uusi työ" title="Lisää uusi työ">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Task Editor Bottom Sheet -->
+  <div class="sheet-backdrop hidden" id="taskSheetBackdrop" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="taskSheetTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="taskSheetTitle">Uusi työ</h2>
+        <button type="button" class="icon-btn" id="closeTaskSheetBtn" aria-label="Sulje">✕</button>
+      </div>
+
+      <form id="taskForm" class="sheet-body">
+        <input type="hidden" id="taskIdInput">
+
+        <div class="field">
+          <label for="taskTitleInput">Työ</label>
+          <input type="text" id="taskTitleInput" maxlength="200" required placeholder="Esim. 8A historian esseet tai kurssityö" autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="taskDeadlineInput">Mihin mennessä (deadline)</label>
+          <div class="date-row">
+            <input type="date" id="taskDeadlineInput" required>
+            <input type="time" id="taskTimeInput" aria-label="Kellonaika (valinnainen)" placeholder="Valinnainen">
+          </div>
+          <div class="quick-chips" id="quickDateChips">
+            <button type="button" class="chip-btn" data-days="0">Tänään</button>
+            <button type="button" class="chip-btn" data-days="1">Huomenna</button>
+            <button type="button" class="chip-btn" data-days="3">+3 pv</button>
+            <button type="button" class="chip-btn" data-days="7">+1 vk</button>
+            <button type="button" class="chip-btn" data-days="14">+2 vk</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Painoarvo</span>
+          <div class="choice-grid" id="priorityPicker" role="radiogroup" aria-label="Painoarvo"></div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Tila</span>
+          <div class="status-picker" id="statusPicker" role="radiogroup" aria-label="Tila"></div>
+        </div>
+
+        <div class="field">
+          <label for="taskNotesInput">Huomiot</label>
+          <textarea id="taskNotesInput" rows="3" placeholder="Lisätiedot, muistutukset, linkit tai arviointikriteerit…"></textarea>
+        </div>
+
+        <div class="sheet-footer">
+          <button type="button" class="btn btn-danger-ghost hidden" id="deleteTaskBtn">Poista</button>
+          <div class="footer-right">
+            <button type="button" class="btn btn-ghost" id="cancelTaskBtn">Peruuta</button>
+            <button type="submit" class="btn btn-primary" id="saveTaskBtn">Tallenna</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings Sheet -->
+  <div class="sheet-backdrop hidden" id="settingsSheetBackdrop" aria-hidden="true">
+    <div class="sheet sheet-tall" role="dialog" aria-modal="true" aria-labelledby="settingsSheetTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="settingsSheetTitle">Asetukset</h2>
+        <button type="button" class="icon-btn" id="closeSettingsBtn" aria-label="Sulje">✕</button>
+      </div>
+
+      <nav class="tabs" role="tablist" aria-label="Asetusosiot">
+        <button type="button" class="tab-btn active" data-tab="statuses" role="tab" aria-selected="true">Tilat</button>
+        <button type="button" class="tab-btn" data-tab="backups" role="tab" aria-selected="false">Varmuuskopiot</button>
+        <button type="button" class="tab-btn" data-tab="updates" role="tab" aria-selected="false">Päivitykset</button>
+        <button type="button" class="tab-btn" data-tab="appearance" role="tab" aria-selected="false">Ulkoasu</button>
+      </nav>
+
+      <div class="sheet-body settings-body">
+        <!-- Tab 1: Statuses -->
+        <section class="tab-panel active" id="tab-statuses" role="tabpanel">
+          <p class="section-hint">
+            Muokkaa tilojen nimiä, värejä ja järjestystä. Svaippi oikealle siirtää seuraavaan tilaan ja vasemmalle edelliseen.
+          </p>
+
+          <div class="status-editor-list" id="statusEditorList"></div>
+
+          <form class="add-status-box" id="addStatusForm">
+            <h3>Lisää uusi tila</h3>
+            <div class="add-status-row">
+              <input type="text" id="newStatusNameInput" maxlength="40" required placeholder="Esim. Tarkistettavana" autocomplete="off">
+              <button type="submit" class="btn btn-primary btn-sm">Lisää</button>
+            </div>
+            <div class="color-palette" id="newStatusColorPalette"></div>
+            <label class="checkbox-row">
+              <input type="checkbox" id="newStatusDoneInput">
+              <span>Lasketaan tehdyksi (piilotetaan, kun "Piilota tehdyt" on päällä)</span>
+            </label>
+          </form>
+        </section>
+
+        <!-- Tab 2: Backups -->
+        <section class="tab-panel" id="tab-backups" role="tabpanel">
+          <div class="info-card" id="backupStatusCard">
+            <div class="info-card-row">
+              <span class="info-label">Automaattinen kansio</span>
+              <strong id="backupFolderDisplay">Ei valittu</strong>
+            </div>
+            <div class="info-card-row">
+              <span class="info-label">Viimeisin varmuuskopio</span>
+              <span id="backupTimeDisplay">Ei vielä tallennettu</span>
+            </div>
+            <div class="info-card-row">
+              <span class="info-label">Tila</span>
+              <span id="backupStateDisplay">Odottaa kansion valintaa</span>
+            </div>
+            <div class="info-card-row">
+              <span class="info-label">Pysyvä laitetallennus</span>
+              <span id="storagePersistDisplay">Tarkistetaan…</span>
+            </div>
+          </div>
+
+          <p class="section-hint">
+            Kun valitset kansion puhelimeltasi, Arvi tallentaa varmuuskopion automaattisesti aina muutoksen jälkeen
+            (uusin tiedosto + päivittäiset historiakopiot). Kaikki varmuuskopiot säilyvät yhteensopivina tulevien päivitysten kanssa.
+          </p>
+
+          <div class="action-stack">
+            <button type="button" class="btn btn-primary" id="chooseFolderBtn">Valitse varmuuskopiokansio</button>
+            <button type="button" class="btn btn-secondary hidden" id="reauthorizeFolderBtn">Vahvista kansion kirjoitusoikeus</button>
+            <div class="btn-row">
+              <button type="button" class="btn btn-secondary" id="backupNowBtn">Varmuuskopioi nyt</button>
+              <button type="button" class="btn btn-ghost hidden" id="disconnectFolderBtn">Irrota kansio</button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="action-stack">
+            <h3>Tiedostovarmuuskopio ja palautus</h3>
+            <div class="btn-row">
+              <button type="button" class="btn btn-secondary" id="downloadBackupBtn">Lataa (.json)</button>
+              <button type="button" class="btn btn-secondary" id="restoreFileBtn">Palauta tiedostosta</button>
+            </div>
+            <input type="file" id="restoreFileInput" accept=".json,application/json" class="hidden">
+          </div>
+
+          <div class="backup-history-section hidden" id="folderBackupsSection">
+            <h3>Kansion varmuuskopiot</h3>
+            <div class="backup-list" id="folderBackupsList"></div>
+          </div>
+
+          <div class="backup-history-section" id="internalSnapshotsSection">
+            <h3>Automaattiset palautuspisteet laitteella</h3>
+            <p class="section-hint small">Sovellus pitää lisäksi viimeisimmät palautuspisteet tallessa sisäisesti siltä varalta, että vahinko sattuu.</p>
+            <div class="backup-list" id="internalSnapshotsList"></div>
+          </div>
+        </section>
+
+        <!-- Tab 3: Updates -->
+        <section class="tab-panel" id="tab-updates" role="tabpanel">
+          <div class="info-card">
+            <div class="info-card-row">
+              <span class="info-label">Asennettu versio</span>
+              <strong id="appVersionDisplay">v1.0.0</strong>
+            </div>
+            <div class="info-card-row">
+              <span class="info-label">Toimintatila</span>
+              <span>Itsenäinen (offline-valmis)</span>
+            </div>
+          </div>
+
+          <p class="section-hint">
+            Arvi toimii itsenäisesti puhelimellasi eikä lataa päivityksiä taustalla ilman pyyntöäsi.
+            Päivityksen yhteydessä otetaan aina ensin automaattinen varmuuskopio tiedoistasi.
+          </p>
+
+          <button type="button" class="btn btn-primary btn-full" id="checkUpdatesBtn">
+            Tarkista päivitykset
+          </button>
+
+          <div class="update-result hidden" id="updateResultBox" role="status"></div>
+        </section>
+
+        <!-- Tab 4: Appearance -->
+        <section class="tab-panel" id="tab-appearance" role="tabpanel">
+          <div class="field">
+            <span class="field-label">Teema</span>
+            <div class="choice-grid choice-grid-3" id="themePicker">
+              <button type="button" class="choice-btn" data-theme="system">Järjestelmä</button>
+              <button type="button" class="choice-btn" data-theme="light">Vaalea</button>
+              <button type="button" class="choice-btn" data-theme="dark">Tumma</button>
+            </div>
+          </div>
+
+          <div class="info-card" style="margin-top: 16px;">
+            <h3>Asennus Android-puhelimen kotinäytölle</h3>
+            <p class="section-hint" style="margin: 6px 0 0;">
+              Avaa sivu Chrome-selaimella ja valitse valikosta <strong>Lisää aloitusnäyttöön</strong> (tai <strong>Asenna sovellus</strong>).
+              Sen jälkeen Arvi toimii kuin tavallinen sovellus ilman verkkoyhteyttä.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast / Snackbar -->
+  <div class="toast hidden" id="toast" role="status" aria-live="polite">
+    <span id="toastMessage"></span>
+    <button type="button" class="toast-action hidden" id="toastActionBtn"></button>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

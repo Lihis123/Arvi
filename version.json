@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "releasedAt": "2026-11-24",
+  "changelog": [
+    "Ensimmäinen julkaisu: aikajärjestyksessä oleva työlista, svaippaus tilojen vaihtoon ja tehtyjen piilotus.",
+    "Muokattavat tilat (nimet, värit, järjestys ja piilotusasetus).",
+    "Automaattinen paikallinen varmuuskopiointi valittuun kansioon sekä sisäiset palautuspisteet.",
+    "Itsenäinen offline-toiminta ja manuaalinen päivitysten tarkistus."
+  ]
+}
