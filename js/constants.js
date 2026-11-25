@@ -1,5 +1,5 @@
 export const APP_NAME = 'Arvi';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 export const SCHEMA_VERSION = 1;
 
 export const PRIORITIES = [

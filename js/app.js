@@ -401,6 +401,7 @@ function buildTaskCard(task, isDark) {
 
   const statusChip = document.createElement('span');
   statusChip.className = `status-chip${lastChangedTaskId === task.id ? ' just-changed' : ''}`;
+  statusChip.style.setProperty('--status-color', status.color);
   statusChip.innerHTML = `<span class="status-chip-dot" style="background:${status.color}"></span><span>${escapeHtml(status.name)}</span>`;
 
   metaRow.append(deadlineEl, statusChip);

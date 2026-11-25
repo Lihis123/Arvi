@@ -450,9 +450,10 @@ html, body {
   border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 650;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  transition: transform 180ms ease;
+  border: 1.5px solid var(--status-color, var(--border));
+  background: color-mix(in srgb, var(--status-color, var(--accent)) 16%, var(--surface));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--status-color, transparent) 24%, transparent);
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .status-chip.just-changed {
