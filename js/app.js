@@ -408,12 +408,50 @@ function buildTaskCard(task, isDark) {
     <span>${escapeHtml(deadlineInfo.text)}</span>
   `;
 
-  const statusChip = document.createElement('span');
-  statusChip.className = `status-chip${lastChangedTaskId === task.id ? ' just-changed' : ''}`;
-  statusChip.style.setProperty('--status-color', status.color);
-  statusChip.innerHTML = `<span class="status-chip-dot" style="background:${status.color}"></span><span>${escapeHtml(status.name)}</span>`;
+  const statusProgress = document.createElement('div');
+  statusProgress.className = `status-progress${lastChangedTaskId === task.id ? ' just-changed' : ''}`;
+  statusProgress.setAttribute(
+    'aria-label',
+    `Tila: ${status.name} (vaihe ${statusIdx + 1}/${state.statuses.length})`
+  );
 
-  metaRow.append(deadlineEl, statusChip);
+  const statusLabel = document.createElement('span');
+  statusLabel.className = 'status-label';
+  statusLabel.style.setProperty('--status-color', status.color);
+  statusLabel.textContent = status.name;
+  statusProgress.appendChild(statusLabel);
+
+  const stepCount = state.statuses.length;
+  if (stepCount >= 2 && stepCount <= 8) {
+    const stepper = document.createElement('div');
+    stepper.className = 'status-stepper';
+    stepper.style.setProperty('--step-count', String(stepCount));
+    stepper.setAttribute('aria-hidden', 'true');
+
+    state.statuses.forEach((st, i) => {
+      if (i > 0) {
+        const line = document.createElement('span');
+        const filled = i <= statusIdx;
+        line.className = `status-step-line${filled ? ' is-filled' : ''}`;
+        if (filled) {
+          line.style.setProperty('--line-from', state.statuses[i - 1].color);
+          line.style.setProperty('--line-to', st.color);
+        }
+        stepper.appendChild(line);
+      }
+
+      const dot = document.createElement('span');
+      const dotState = i < statusIdx ? 'is-passed' : i === statusIdx ? 'is-current' : 'is-upcoming';
+      dot.className = `status-step-dot ${dotState}`;
+      dot.style.setProperty('--dot-color', st.color);
+      dot.title = st.name;
+      stepper.appendChild(dot);
+    });
+
+    statusProgress.appendChild(stepper);
+  }
+
+  metaRow.append(deadlineEl, statusProgress);
   body.append(topRow, metaRow);
 
   // Optional bottom row: notes preview + quick "Merkitse valmiiksi" button

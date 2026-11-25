@@ -1,8 +1,7 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "releasedAt": "2026-11-25",
   "changelog": [
-    "Työkorttien oikeassa alakulmassa on nyt pikanappi \"Merkitse valmiiksi\", jolla työn voi kuitata suoraan valmiiksi ohittaen välivaiheet.",
-    "Napin näkyvyyden voi kytkeä päälle tai pois kohdasta Asetukset → Ulkoasu."
+    "Työkorttien tilanäyttö uudistettu: tilan nimi näytetään selkeästi ilman laatikkoa ja sen alla kulkee prosessiviiva pisteineen (tukee dynaamisesti 2–8 tilaa; yli 8 tilassa näytetään pelkkä tilan nimi)."
   ]
 }
