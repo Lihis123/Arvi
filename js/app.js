@@ -110,6 +110,7 @@ const els = {
   checkUpdatesBtn: document.getElementById('checkUpdatesBtn'),
   updateResultBox: document.getElementById('updateResultBox'),
   themePicker: document.getElementById('themePicker'),
+  showQuickDoneToggle: document.getElementById('showQuickDoneToggle'),
 
   // Toast
   toast: document.getElementById('toast'),
@@ -220,6 +221,10 @@ function getStatusById(id) {
 function getStatusIndex(id) {
   const idx = state.statuses.findIndex((s) => s.id === id);
   return idx >= 0 ? idx : 0;
+}
+
+function getDoneStatus() {
+  return state.statuses.find((s) => s.isDone) || state.statuses[state.statuses.length - 1] || null;
 }
 
 /* ---------- Toast Notification ---------- */
@@ -411,18 +416,58 @@ function buildTaskCard(task, isDark) {
   metaRow.append(deadlineEl, statusChip);
   body.append(topRow, metaRow);
 
-  // Optional notes preview
-  if (task.notes && task.notes.trim()) {
-    const notesEl = document.createElement('div');
-    notesEl.className = 'task-notes-preview';
-    notesEl.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-      </svg>
-      <span></span>
-    `;
-    notesEl.querySelector('span').textContent = task.notes.trim();
-    body.appendChild(notesEl);
+  // Optional bottom row: notes preview + quick "Merkitse valmiiksi" button
+  const hasNotes = Boolean(task.notes && task.notes.trim());
+  const doneStatus = getDoneStatus();
+  const showQuickDone = Boolean(
+    state.settings.showQuickDoneButton !== false &&
+    !status.isDone &&
+    doneStatus &&
+    doneStatus.id !== status.id
+  );
+
+  if (hasNotes || showQuickDone) {
+    const bottomRow = document.createElement('div');
+    bottomRow.className = `task-bottom-row${hasNotes ? '' : ' no-notes'}`;
+
+    if (hasNotes) {
+      const notesEl = document.createElement('div');
+      notesEl.className = 'task-notes-preview';
+      notesEl.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span></span>
+      `;
+      notesEl.querySelector('span').textContent = task.notes.trim();
+      bottomRow.appendChild(notesEl);
+    }
+
+    if (showQuickDone) {
+      const quickDoneBtn = document.createElement('button');
+      quickDoneBtn.type = 'button';
+      quickDoneBtn.className = 'quick-done-btn';
+      quickDoneBtn.style.setProperty('--done-color', doneStatus.color);
+      quickDoneBtn.setAttribute('aria-label', `Merkitse "${task.title}" valmiiksi`);
+      quickDoneBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>Merkitse valmiiksi</span>
+      `;
+      quickDoneBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try {
+          if (navigator.vibrate) navigator.vibrate(12);
+        } catch {
+          // Ignore
+        }
+        changeTaskStatus(task.id, doneStatus.id, wrap);
+      });
+      bottomRow.appendChild(quickDoneBtn);
+    }
+
+    body.appendChild(bottomRow);
   }
 
   card.append(bar, body);
@@ -787,6 +832,7 @@ function openSettingsSheet(tabName = 'statuses') {
   renderStatusEditor();
   renderBackupPanel();
   els.appVersionDisplay.textContent = `v${APP_VERSION}`;
+  els.showQuickDoneToggle.checked = state.settings.showQuickDoneButton !== false;
   els.settingsSheetBackdrop.classList.remove('hidden');
   els.settingsSheetBackdrop.setAttribute('aria-hidden', 'false');
 }
@@ -1137,6 +1183,7 @@ async function applyRestoreResult(result) {
   state.titleHistory = result.state.titleHistory || [];
 
   applyTheme(state.settings.theme);
+  els.showQuickDoneToggle.checked = state.settings.showQuickDoneButton !== false;
   renderApp();
   renderStatusEditor();
   await persistAndBackup('restore');
@@ -1282,6 +1329,12 @@ els.themePicker.addEventListener('click', async (e) => {
   await persistAndBackup('theme-change');
 });
 
+els.showQuickDoneToggle.addEventListener('change', async () => {
+  state.settings.showQuickDoneButton = els.showQuickDoneToggle.checked;
+  renderApp();
+  await persistAndBackup('toggle-quick-done-btn');
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!els.titleSuggestions.classList.contains('hidden')) {
@@ -1344,6 +1397,7 @@ async function init() {
     };
   }
   applyTheme(state.settings.theme);
+  els.showQuickDoneToggle.checked = state.settings.showQuickDoneButton !== false;
   renderApp();
 
   // Request durable browser storage & initialize backup subsystem

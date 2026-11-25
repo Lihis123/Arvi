@@ -1,5 +1,5 @@
 export const APP_NAME = 'Arvi';
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 export const SCHEMA_VERSION = 1;
 
 export const PRIORITIES = [
@@ -34,5 +34,6 @@ export const DEFAULT_SETTINGS = {
   hideDone: false,
   theme: 'system', // 'system' | 'light' | 'dark'
   keepDailyBackups: 14,
-  autoBackupEnabled: true
+  autoBackupEnabled: true,
+  showQuickDoneButton: true
 };

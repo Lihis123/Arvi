@@ -136,7 +136,8 @@ export function normalizeSettings(raw) {
     hideDone: Boolean(src.hideDone ?? DEFAULT_SETTINGS.hideDone),
     theme,
     keepDailyBackups,
-    autoBackupEnabled: src.autoBackupEnabled === undefined ? DEFAULT_SETTINGS.autoBackupEnabled : Boolean(src.autoBackupEnabled)
+    autoBackupEnabled: src.autoBackupEnabled === undefined ? DEFAULT_SETTINGS.autoBackupEnabled : Boolean(src.autoBackupEnabled),
+    showQuickDoneButton: src.showQuickDoneButton === undefined ? DEFAULT_SETTINGS.showQuickDoneButton : Boolean(src.showQuickDoneButton)
   };
 }
 

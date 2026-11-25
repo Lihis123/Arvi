@@ -473,14 +473,29 @@ html, body {
   flex-shrink: 0;
 }
 
+.task-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.task-bottom-row.no-notes {
+  justify-content: flex-end;
+  padding-top: 2px;
+  border-top: none;
+}
+
 .task-notes-preview {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
   font-size: 0.82rem;
   color: var(--text-muted);
-  padding-top: 2px;
-  border-top: 1px dashed var(--border);
 }
 
 .task-notes-preview svg {
@@ -495,6 +510,38 @@ html, body {
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: pre-line;
+}
+
+.quick-done-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--done-color, #059669) 55%, transparent);
+  background: color-mix(in srgb, var(--done-color, #059669) 14%, var(--surface));
+  color: var(--done-color, #059669);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, transform 120ms ease, box-shadow 140ms ease;
+}
+
+:root[data-theme="dark"] .quick-done-btn {
+  color: color-mix(in srgb, var(--done-color, #10b981) 70%, #ffffff);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--done-color, #059669) 20%, transparent);
+}
+
+.quick-done-btn:hover {
+  background: color-mix(in srgb, var(--done-color, #059669) 24%, var(--surface));
+}
+
+.quick-done-btn:active {
+  transform: scale(0.95);
 }
 
 .swipe-hint {
@@ -773,6 +820,8 @@ textarea {
   z-index: 40;
   max-height: 224px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1138,6 +1187,84 @@ textarea {
 
 .info-card-row + .info-card-row {
   border-top: 1px solid var(--border);
+}
+
+.setting-toggle-card {
+  margin-top: 12px;
+}
+
+.toggle-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+}
+
+.toggle-setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.toggle-setting-text strong {
+  font-size: 0.9rem;
+}
+
+.toggle-setting-text span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 46px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 180ms ease;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.switch input:checked + .switch-slider {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-slider::before {
+  transform: translateX(20px);
+}
+
+.switch input:focus-visible + .switch-slider {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .info-label {

@@ -1,8 +1,8 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "releasedAt": "2026-11-25",
   "changelog": [
-    "Työ-kenttää klikkaamalla näet aiemmin käytetyt työnimet yleisyysjärjestyksessä.",
-    "Voit poistaa yksittäisen ehdotuksen pysyvästi oikean reunan ✕-painikkeesta (palautuu vasta, jos kirjoitat ja tallennat nimen uudelleen)."
+    "Työkorttien oikeassa alakulmassa on nyt pikanappi \"Merkitse valmiiksi\", jolla työn voi kuitata suoraan valmiiksi ohittaen välivaiheet.",
+    "Napin näkyvyyden voi kytkeä päälle tai pois kohdasta Asetukset → Ulkoasu."
   ]
 }
