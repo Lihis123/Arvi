@@ -1,5 +1,11 @@
 import { DEFAULT_SETTINGS, DEFAULT_STATUSES, SCHEMA_VERSION } from './constants.js';
-import { createBackupEnvelope, normalizeSettings, normalizeStatus, normalizeTask } from './migrations.js';
+import {
+  createBackupEnvelope,
+  normalizeSettings,
+  normalizeStatus,
+  normalizeTask,
+  normalizeTitleHistory
+} from './migrations.js';
 
 const DB_NAME = 'arvi-db';
 const DB_VERSION = 1;
@@ -129,7 +135,8 @@ export async function loadAppState() {
       schemaVersion: SCHEMA_VERSION,
       tasks: [],
       statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
-      settings: { ...DEFAULT_SETTINGS }
+      settings: { ...DEFAULT_SETTINGS },
+      titleHistory: []
     };
   }
 
@@ -147,7 +154,8 @@ export async function loadAppState() {
     schemaVersion: SCHEMA_VERSION,
     tasks,
     statuses: finalStatuses,
-    settings: normalizeSettings(stored.settings)
+    settings: normalizeSettings(stored.settings),
+    titleHistory: normalizeTitleHistory(stored.titleHistory, tasks)
   };
 }
 
@@ -160,6 +168,7 @@ export async function saveAppState(state) {
     tasks: state.tasks,
     statuses: state.statuses,
     settings: state.settings,
+    titleHistory: normalizeTitleHistory(state.titleHistory, state.tasks),
     savedAt: new Date().toISOString()
   };
 

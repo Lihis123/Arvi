@@ -4,6 +4,7 @@ import {
   compareTasksChronologically,
   computeChecksum,
   createBackupEnvelope,
+  normalizeTitleHistory,
   parseAndMigrateBackup
 } from '../js/migrations.js';
 import { compareVersions } from '../js/updater.js';
@@ -150,4 +151,43 @@ test('compareVersions handles semantic version comparisons accurately', () => {
   assert.equal(compareVersions('2.0.0', '1.9.9'), 1);
   assert.equal(compareVersions('1.0.0', '1.0.0'), 0);
   assert.equal(compareVersions('v1.0.2', '1.0.1'), 1);
+});
+
+test('normalizeTitleHistory seeds from legacy tasks sorted by frequency and respects empty array', async () => {
+  const legacyTasks = [
+    { title: 'Essee', createdAt: '2026-11-01T10:00:00Z' },
+    { title: 'Koe', createdAt: '2026-11-02T10:00:00Z' },
+    { title: 'Koe', createdAt: '2026-11-03T10:00:00Z' },
+    { title: 'koe', createdAt: '2026-11-04T10:00:00Z' },
+    { title: 'Essee', createdAt: '2026-11-05T10:00:00Z' },
+    { title: 'Labra', createdAt: '2026-11-06T10:00:00Z' }
+  ];
+
+  // Legacy backup with no titleHistory field seeds from tasks sorted by frequency
+  const seeded = normalizeTitleHistory(undefined, legacyTasks);
+  assert.deepEqual(
+    seeded.map((x) => [x.title.toLowerCase(), x.count]),
+    [['koe', 3], ['essee', 2], ['labra', 1]]
+  );
+
+  // Explicit empty array (user deleted all suggestions) stays empty
+  const cleared = normalizeTitleHistory([], legacyTasks);
+  assert.deepEqual(cleared, []);
+
+  // Round-trip through backup envelope preserves titleHistory accurately
+  const env = await createBackupEnvelope({
+    tasks: [],
+    statuses: DEFAULT_STATUSES,
+    settings: {},
+    titleHistory: [
+      { title: 'Harjoitustyö', count: 5, lastUsedAt: '2026-11-20T10:00:00Z' },
+      { title: 'Välikoe', count: 2, lastUsedAt: '2026-11-22T10:00:00Z' }
+    ]
+  });
+  const restored = await parseAndMigrateBackup(JSON.stringify(env));
+  assert.equal(restored.ok, true);
+  assert.deepEqual(
+    restored.state.titleHistory.map((x) => [x.title, x.count]),
+    [['Harjoitustyö', 5], ['Välikoe', 2]]
+  );
 });

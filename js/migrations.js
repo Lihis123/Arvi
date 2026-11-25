@@ -151,13 +151,81 @@ const MIGRATIONS = {
 };
 
 /**
+ * Normalizes title suggestion history.
+ * - If `rawHistory` is provided as an array (even empty `[]`), respects it so deleted suggestions stay deleted.
+ * - If `rawHistory` is missing (e.g. legacy v1.0.0/v1.0.1 backup), seeds initial suggestions from existing tasks.
+ */
+export function normalizeTitleHistory(rawHistory, fallbackTasks = []) {
+  const byKey = new Map();
+
+  if (Array.isArray(rawHistory)) {
+    for (const item of rawHistory) {
+      if (!item || typeof item !== 'object') continue;
+      const title = String(item.title ?? '').trim().slice(0, 200);
+      if (!title) continue;
+      const key = title.toLowerCase();
+      const count = Number.isFinite(item.count) && item.count >= 1 ? Math.floor(item.count) : 1;
+      const lastUsedAt = typeof item.lastUsedAt === 'string' ? item.lastUsedAt : new Date().toISOString();
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += count;
+        if (lastUsedAt > existing.lastUsedAt) {
+          existing.lastUsedAt = lastUsedAt;
+          existing.title = title;
+        }
+      } else {
+        byKey.set(key, { title, count, lastUsedAt });
+      }
+    }
+  } else if (Array.isArray(fallbackTasks)) {
+    for (const task of fallbackTasks) {
+      if (!task || typeof task !== 'object') continue;
+      const title = String(task.title ?? '').trim().slice(0, 200);
+      if (!title) continue;
+      const key = title.toLowerCase();
+      const lastUsedAt = typeof task.updatedAt === 'string'
+        ? task.updatedAt
+        : (typeof task.createdAt === 'string' ? task.createdAt : new Date().toISOString());
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (lastUsedAt > existing.lastUsedAt) {
+          existing.lastUsedAt = lastUsedAt;
+          existing.title = title;
+        }
+      } else {
+        byKey.set(key, { title, count: 1, lastUsedAt });
+      }
+    }
+  }
+
+  return sortTitleHistory(Array.from(byKey.values()));
+}
+
+/**
+ * Sorts title suggestions by most commonly used first, then most recently used, then alphabetically.
+ */
+export function sortTitleHistory(history) {
+  return [...history].sort((a, b) => {
+    if ((b.count || 0) !== (a.count || 0)) {
+      return (b.count || 0) - (a.count || 0);
+    }
+    const timeCmp = String(b.lastUsedAt || '').localeCompare(String(a.lastUsedAt || ''));
+    if (timeCmp !== 0) return timeCmp;
+    return String(a.title || '').localeCompare(String(b.title || ''), 'fi');
+  });
+}
+
+/**
  * Builds a versioned, checksummed backup envelope ready to serialize as JSON.
  */
 export async function createBackupEnvelope(state) {
+  const tasks = Array.isArray(state.tasks) ? state.tasks : [];
   const data = {
-    tasks: Array.isArray(state.tasks) ? state.tasks : [],
+    tasks,
     statuses: Array.isArray(state.statuses) && state.statuses.length > 0 ? state.statuses : DEFAULT_STATUSES,
-    settings: normalizeSettings(state.settings)
+    settings: normalizeSettings(state.settings),
+    titleHistory: normalizeTitleHistory(state.titleHistory, tasks)
   };
   const checksum = await computeChecksum(data);
   return {
@@ -269,10 +337,11 @@ export async function parseAndMigrateBackup(input) {
   }
 
   const settings = normalizeSettings(working.settings);
+  const titleHistory = normalizeTitleHistory(working.titleHistory, tasks);
 
   return {
     ok: true,
-    state: { tasks, statuses: finalStatuses, settings },
+    state: { tasks, statuses: finalStatuses, settings, titleHistory },
     warnings,
     meta: {
       sourceVersion,

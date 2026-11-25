@@ -131,7 +131,10 @@
 
         <div class="field">
           <label for="taskTitleInput">Työ</label>
-          <input type="text" id="taskTitleInput" maxlength="200" required placeholder="Esim. 8A historian esseet tai kurssityö" autocomplete="off">
+          <div class="title-autocomplete" id="titleAutocomplete">
+            <input type="text" id="taskTitleInput" maxlength="200" required placeholder="Esim. 8A historian esseet tai kurssityö" autocomplete="off" aria-autocomplete="list" aria-controls="titleSuggestions" aria-expanded="false">
+            <div class="title-suggestions hidden" id="titleSuggestions" role="listbox" aria-label="Aiemmin käytetyt työt"></div>
+          </div>
         </div>
 
         <div class="field">

@@ -14,7 +14,8 @@ import {
 } from './db.js';
 import {
   compareTasksChronologically,
-  generateId
+  generateId,
+  sortTitleHistory
 } from './migrations.js';
 import { BackupManager } from './backup.js';
 import { AppUpdater } from './updater.js';
@@ -25,7 +26,8 @@ const SWIPE_HINT_SEEN_KEY = 'arvi_swipe_hint_seen';
 let state = {
   tasks: [],
   statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
-  settings: { ...DEFAULT_SETTINGS }
+  settings: { ...DEFAULT_SETTINGS },
+  titleHistory: []
 };
 
 let backupStatus = null;
@@ -72,7 +74,9 @@ const els = {
   deleteTaskBtn: document.getElementById('deleteTaskBtn'),
   taskForm: document.getElementById('taskForm'),
   taskIdInput: document.getElementById('taskIdInput'),
+  titleAutocomplete: document.getElementById('titleAutocomplete'),
   taskTitleInput: document.getElementById('taskTitleInput'),
+  titleSuggestions: document.getElementById('titleSuggestions'),
   taskDeadlineInput: document.getElementById('taskDeadlineInput'),
   taskTimeInput: document.getElementById('taskTimeInput'),
   quickDateChips: document.getElementById('quickDateChips'),
@@ -493,6 +497,131 @@ async function changeTaskStatus(taskId, newStatusId, wrapEl = null) {
 
 let selectedPriority = 'normal';
 let selectedStatusId = null;
+let isProgrammaticTitleFocus = false;
+
+function recordTitleUsage(rawTitle) {
+  const title = String(rawTitle || '').trim().slice(0, 200);
+  if (!title) return;
+  if (!Array.isArray(state.titleHistory)) state.titleHistory = [];
+
+  const key = title.toLowerCase();
+  const now = new Date().toISOString();
+  const existing = state.titleHistory.find((entry) => entry.title.toLowerCase() === key);
+  if (existing) {
+    existing.count = (existing.count || 1) + 1;
+    existing.title = title;
+    existing.lastUsedAt = now;
+  } else {
+    state.titleHistory.push({ title, count: 1, lastUsedAt: now });
+  }
+  state.titleHistory = sortTitleHistory(state.titleHistory);
+}
+
+async function removeTitleSuggestion(titleToRemove) {
+  const key = String(titleToRemove || '').trim().toLowerCase();
+  if (!key || !Array.isArray(state.titleHistory)) return;
+  state.titleHistory = state.titleHistory.filter((entry) => entry.title.toLowerCase() !== key);
+  renderTitleSuggestions(els.taskTitleInput.value);
+  await persistAndBackup('title-suggestion-remove');
+}
+
+function hideTitleSuggestions() {
+  els.titleSuggestions.classList.add('hidden');
+  els.taskTitleInput.setAttribute('aria-expanded', 'false');
+}
+
+function renderTitleSuggestions(query = '') {
+  const history = sortTitleHistory(Array.isArray(state.titleHistory) ? state.titleHistory : []);
+  const q = String(query || '').trim().toLowerCase();
+
+  let matches = history;
+  if (q) {
+    const startsWith = history.filter((item) => item.title.toLowerCase().startsWith(q));
+    const contains = history.filter(
+      (item) => !item.title.toLowerCase().startsWith(q) && item.title.toLowerCase().includes(q)
+    );
+    matches = [...startsWith, ...contains];
+  }
+
+  if (matches.length === 0) {
+    hideTitleSuggestions();
+    return;
+  }
+
+  els.titleSuggestions.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  for (const item of matches) {
+    const row = document.createElement('div');
+    row.className = 'title-suggestion-row';
+    row.setAttribute('role', 'option');
+
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.className = 'title-suggestion-pick';
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'title-suggestion-text';
+    textSpan.textContent = item.title;
+    pickBtn.appendChild(textSpan);
+
+    if (item.count > 1) {
+      const countSpan = document.createElement('span');
+      countSpan.className = 'title-suggestion-count';
+      countSpan.textContent = `${item.count}×`;
+      countSpan.title = `Käytetty ${item.count} kertaa`;
+      pickBtn.appendChild(countSpan);
+    }
+
+    pickBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    pickBtn.addEventListener('click', () => {
+      els.taskTitleInput.value = item.title;
+      hideTitleSuggestions();
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'title-suggestion-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.title = `Poista "${item.title}" ehdotuksista`;
+    removeBtn.setAttribute('aria-label', `Poista ${item.title} ehdotuksista`);
+    removeBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    removeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeTitleSuggestion(item.title);
+    });
+
+    row.append(pickBtn, removeBtn);
+    frag.appendChild(row);
+  }
+
+  els.titleSuggestions.appendChild(frag);
+  els.titleSuggestions.classList.remove('hidden');
+  els.taskTitleInput.setAttribute('aria-expanded', 'true');
+}
+
+els.taskTitleInput.addEventListener('click', () => {
+  renderTitleSuggestions(els.taskTitleInput.value);
+});
+
+els.taskTitleInput.addEventListener('focus', () => {
+  if (isProgrammaticTitleFocus) return;
+  renderTitleSuggestions(els.taskTitleInput.value);
+});
+
+els.taskTitleInput.addEventListener('input', () => {
+  renderTitleSuggestions(els.taskTitleInput.value);
+});
+
+document.addEventListener('pointerdown', (e) => {
+  if (!els.titleSuggestions.classList.contains('hidden') && !els.titleAutocomplete.contains(e.target)) {
+    hideTitleSuggestions();
+  }
+});
 
 function renderPriorityPicker() {
   els.priorityPicker.innerHTML = '';
@@ -557,13 +686,19 @@ function openTaskSheet(task = null) {
 
   renderPriorityPicker();
   renderStatusPicker();
+  hideTitleSuggestions();
 
   els.taskSheetBackdrop.classList.remove('hidden');
   els.taskSheetBackdrop.setAttribute('aria-hidden', 'false');
-  setTimeout(() => els.taskTitleInput.focus(), 60);
+  setTimeout(() => {
+    isProgrammaticTitleFocus = true;
+    els.taskTitleInput.focus();
+    isProgrammaticTitleFocus = false;
+  }, 60);
 }
 
 function closeTaskSheet() {
+  hideTitleSuggestions();
   els.taskSheetBackdrop.classList.add('hidden');
   els.taskSheetBackdrop.setAttribute('aria-hidden', 'true');
 }
@@ -581,6 +716,7 @@ els.taskForm.addEventListener('submit', async (e) => {
   if (existingId) {
     const task = state.tasks.find((t) => t.id === existingId);
     if (task) {
+      const titleChanged = task.title.trim().toLowerCase() !== title.toLowerCase();
       task.title = title;
       task.deadline = deadline;
       task.deadlineTime = els.taskTimeInput.value || '';
@@ -589,6 +725,9 @@ els.taskForm.addEventListener('submit', async (e) => {
       task.notes = els.taskNotesInput.value.trim();
       task.updatedAt = now;
       task.completedAt = st.isDone ? (task.completedAt || now) : null;
+      if (titleChanged) {
+        recordTitleUsage(title);
+      }
     }
     closeTaskSheet();
     renderApp();
@@ -607,6 +746,7 @@ els.taskForm.addEventListener('submit', async (e) => {
       updatedAt: now,
       completedAt: st.isDone ? now : null
     });
+    recordTitleUsage(title);
     closeTaskSheet();
     renderApp();
     await persistAndBackup('task-add');
@@ -994,6 +1134,7 @@ async function applyRestoreResult(result) {
   state.tasks = result.state.tasks;
   state.statuses = result.state.statuses;
   state.settings = result.state.settings;
+  state.titleHistory = result.state.titleHistory || [];
 
   applyTheme(state.settings.theme);
   renderApp();
@@ -1143,6 +1284,10 @@ els.themePicker.addEventListener('click', async (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (!els.titleSuggestions.classList.contains('hidden')) {
+      hideTitleSuggestions();
+      return;
+    }
     closeTaskSheet();
     closeSettingsSheet();
   }
@@ -1194,7 +1339,8 @@ async function init() {
     state = {
       tasks: [],
       statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
-      settings: { ...DEFAULT_SETTINGS }
+      settings: { ...DEFAULT_SETTINGS },
+      titleHistory: []
     };
   }
   applyTheme(state.settings.theme);

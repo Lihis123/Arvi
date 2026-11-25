@@ -1,7 +1,8 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "releasedAt": "2026-11-25",
   "changelog": [
-    "Päänäkymän Tila-merkinnät saivat saman värillisen reunuksen, taustasävyn ja pehmeän hehkun kuin muokkausvalikossa."
+    "Työ-kenttää klikkaamalla näet aiemmin käytetyt työnimet yleisyysjärjestyksessä.",
+    "Voit poistaa yksittäisen ehdotuksen pysyvästi oikean reunan ✕-painikkeesta (palautuu vasta, jos kirjoitat ja tallennat nimen uudelleen)."
   ]
 }
