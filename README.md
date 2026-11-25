@@ -10,7 +10,7 @@ Kevyt, nopea ja suomenkielinen Android-puhelimelle suunniteltu PWA-sovellus tule
 - **Toimii itsenäisesti offline-tilassa**: Ensimmäisen latauksen jälkeen sovellus toimii täysin itsenäisesti puhelimessasi ilman verkkoyhteyttä.
 - **Päivitykset vain pyynnöstä**: Sovellus ei päivity taustalla ilman lupaasi. Asetuksissa on erillinen **Tarkista päivitykset** -painike, joka tarkistaa uuden version ja tekee ennen päivitystä aina automaattisen varmuuskopion.
 - **Luotettavat paikalliset varmuuskopiot**:
-  - Valitse puhelimeltasi paikallinen kansio (*Asetukset → Varmuuskopiot*), jonne Arvi tallentaa varmuuskopion **automaattisesti jokaisen muutoksen jälkeen** (`arvi-varmuuskopio-uusin.json` + päivittäiset historiakopiot).
+  - Valitse puhelimeltasi paikallinen kansio (*Asetukset → Varmuuskopiot*), jonne Arvi luo oman `Arvi-varmuuskopiot`-alikansion ja tallentaa varmuuskopion **automaattisesti jokaisen muutoksen jälkeen** porrastetulla säilytyksellä (uusin + 7 päivittäistä + 4 viikoittaista + 6 kuukausittaista = enintään 18 tiedostoa).
   - Lisäksi laitteen sisäiset palautuspisteet (IndexedDB) ja manuaalinen `.json`-vienti/tuonti.
   - Versioitu tietomalli (`schemaVersion`) ja tarkistussumma varmistavat, että vanhat varmuuskopiot toimivat aina myös uusien versioiden kanssa.
 

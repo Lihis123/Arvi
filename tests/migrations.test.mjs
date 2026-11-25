@@ -7,6 +7,7 @@ import {
   normalizeTitleHistory,
   parseAndMigrateBackup
 } from '../js/migrations.js';
+import { getIsoWeekKey, LATEST_FILENAME, planBackupRetention } from '../js/retention.js';
 import { compareVersions } from '../js/updater.js';
 import { APP_VERSION, DEFAULT_STATUSES, SCHEMA_VERSION } from '../js/constants.js';
 
@@ -190,4 +191,44 @@ test('normalizeTitleHistory seeds from legacy tasks sorted by frequency and resp
     restored.state.titleHistory.map((x) => [x.title, x.count]),
     [['Harjoitustyö', 5], ['Välikoe', 2]]
   );
+});
+
+test('planBackupRetention enforces 7 daily + 4 weekly + 6 monthly cap without touching non-dated files', () => {
+  assert.equal(getIsoWeekKey('2026-11-25'), '2026-W48');
+
+  // Generate 400 consecutive days ending 2026-11-25
+  const base = Date.UTC(2026, 10, 25);
+  const dailyNames = [];
+  for (let i = 0; i < 400; i++) {
+    const d = new Date(base - i * 86400000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    dailyNames.push(`arvi-varmuuskopio-${y}-${m}-${day}.json`);
+  }
+
+  const allFiles = [LATEST_FILENAME, 'notes.txt', 'other.json', 'photo.jpg', ...dailyNames];
+  const plan = planBackupRetention(allFiles);
+
+  assert.equal(plan.tiers.daily.length, 7);
+  assert.equal(plan.tiers.weekly.length, 4);
+  assert.equal(plan.tiers.monthly.length, 6);
+  assert.equal(plan.keep.length, 17);
+  assert.equal(plan.delete.length, 400 - 17);
+
+  // Never deletes latest backup or unrelated user files
+  assert.ok(!plan.delete.includes(LATEST_FILENAME));
+  assert.ok(!plan.delete.includes('notes.txt'));
+  assert.ok(!plan.delete.includes('other.json'));
+  assert.ok(!plan.delete.includes('photo.jpg'));
+
+  // Small backup sets keep everything
+  const smallPlan = planBackupRetention([
+    LATEST_FILENAME,
+    'arvi-varmuuskopio-2026-11-25.json',
+    'arvi-varmuuskopio-2026-11-24.json',
+    'arvi-varmuuskopio-2026-11-23.json'
+  ]);
+  assert.equal(smallPlan.keep.length, 3);
+  assert.equal(smallPlan.delete.length, 0);
 });

@@ -1,4 +1,4 @@
-const CACHE_VERSION = '1.0.4';
+const CACHE_VERSION = '1.0.5';
 const CACHE_NAME = `arvi-app-shell-v${CACHE_VERSION}`;
 
 const APP_ASSETS = [
@@ -10,6 +10,7 @@ const APP_ASSETS = [
   './js/constants.js',
   './js/migrations.js',
   './js/db.js',
+  './js/retention.js',
   './js/backup.js',
   './js/updater.js',
   './js/swipe.js',

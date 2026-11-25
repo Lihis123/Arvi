@@ -7,10 +7,14 @@ import {
   saveInternalSnapshot
 } from './db.js';
 import { createBackupEnvelope, parseAndMigrateBackup } from './migrations.js';
-
-const LATEST_FILENAME = 'arvi-varmuuskopio-uusin.json';
-const DAILY_PREFIX = 'arvi-varmuuskopio-';
-const DAILY_REGEX = /^arvi-varmuuskopio-(\d{4}-\d{2}-\d{2})\.json$/;
+import {
+  BACKUP_SUBFOLDER_NAME,
+  DAILY_PREFIX,
+  DAILY_REGEX,
+  DEFAULT_RETENTION,
+  LATEST_FILENAME,
+  planBackupRetention
+} from './retention.js';
 
 function getLocalDateKey(date = new Date()) {
   const y = date.getFullYear();
@@ -39,6 +43,31 @@ export class BackupManager {
     return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
   }
 
+  getDisplayFolderPath(handle) {
+    if (!handle) return null;
+    const name = String(handle.name || 'Valittu kansio').trim();
+    if (name.toLowerCase() === BACKUP_SUBFOLDER_NAME.toLowerCase()) {
+      return name;
+    }
+    return `${name} / ${BACKUP_SUBFOLDER_NAME}`;
+  }
+
+  async resolveTargetDirectory(create = true) {
+    if (!this.dirHandle) return null;
+    const name = String(this.dirHandle.name || '').trim();
+    if (name.toLowerCase() === BACKUP_SUBFOLDER_NAME.toLowerCase()) {
+      return this.dirHandle;
+    }
+    try {
+      return await this.dirHandle.getDirectoryHandle(BACKUP_SUBFOLDER_NAME, { create });
+    } catch (err) {
+      if (!create && err && err.name === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
   async init() {
     this.meta = { ...this.meta, ...(await loadBackupMeta()) };
     this.dirHandle = await loadBackupDirectoryHandle();
@@ -46,7 +75,7 @@ export class BackupManager {
     if (!this.supportsFolderPicker) {
       this.meta.lastBackupStatus = 'unsupported';
     } else if (this.dirHandle) {
-      this.meta.folderName = this.dirHandle.name || this.meta.folderName;
+      this.meta.folderName = this.getDisplayFolderPath(this.dirHandle) || this.meta.folderName;
       const perm = await this.queryFolderPermission();
       if (perm === 'granted') {
         this.meta.lastBackupStatus = this.meta.lastBackupAt ? 'ok' : 'idle';
@@ -104,7 +133,7 @@ export class BackupManager {
 
       this.dirHandle = handle;
       await saveBackupDirectoryHandle(handle);
-      this.meta.folderName = handle.name || 'Valittu kansio';
+      this.meta.folderName = this.getDisplayFolderPath(handle);
       this.meta.lastError = null;
       this.meta.pendingSync = false;
       await saveBackupMeta(this.meta);
@@ -211,19 +240,19 @@ export class BackupManager {
         return { ok: false, needsPermission: true, error: 'Kansion kirjoitusoikeus vaatii vahvistuksen.' };
       }
 
+      const targetDir = await this.resolveTargetDirectory(true);
       const envelope = await createBackupEnvelope(state);
       const serialized = JSON.stringify(envelope, null, 2);
 
-      // 1. Atomic write to latest backup file
-      await this.writeTextFile(LATEST_FILENAME, serialized);
+      // 1. Atomic write to latest backup file inside dedicated Arvi-varmuuskopiot subfolder
+      await this.writeTextFile(targetDir, LATEST_FILENAME, serialized);
 
       // 2. Atomic write to today's dated snapshot
       const todayFilename = `${DAILY_PREFIX}${getLocalDateKey()}.json`;
-      await this.writeTextFile(todayFilename, serialized);
+      await this.writeTextFile(targetDir, todayFilename, serialized);
 
-      // 3. Prune old dated backups cleanly (keep N most recent days)
-      const keepDays = state.settings?.keepDailyBackups ?? 14;
-      await this.pruneOldDailyBackups(keepDays);
+      // 3. Tiered GFS retention pruning (7 daily + 4 weekly + 6 monthly)
+      await this.pruneBackupsWithRetention(targetDir);
 
       this.meta.lastBackupAt = envelope.exportedAt;
       this.meta.lastBackupStatus = 'ok';
@@ -252,27 +281,26 @@ export class BackupManager {
     }
   }
 
-  async writeTextFile(filename, content) {
-    const fileHandle = await this.dirHandle.getFileHandle(filename, { create: true });
+  async writeTextFile(dirHandle, filename, content) {
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(content);
     await writable.close();
   }
 
-  async pruneOldDailyBackups(keepCount) {
-    if (!this.dirHandle || typeof this.dirHandle.values !== 'function') return;
+  async pruneBackupsWithRetention(targetDir) {
+    if (!targetDir || typeof targetDir.values !== 'function') return;
     try {
-      const datedFiles = [];
-      for await (const entry of this.dirHandle.values()) {
+      const filenames = [];
+      for await (const entry of targetDir.values()) {
         if (entry.kind === 'file' && DAILY_REGEX.test(entry.name)) {
-          datedFiles.push(entry.name);
+          filenames.push(entry.name);
         }
       }
-      datedFiles.sort().reverse(); // Newest YYYY-MM-DD first
-      const toDelete = datedFiles.slice(keepCount);
-      for (const name of toDelete) {
+      const plan = planBackupRetention(filenames, DEFAULT_RETENTION);
+      for (const name of plan.delete) {
         try {
-          await this.dirHandle.removeEntry(name);
+          await targetDir.removeEntry(name);
         } catch {
           // Non-critical if deletion fails
         }
@@ -283,7 +311,8 @@ export class BackupManager {
   }
 
   /**
-   * Lists Arvi backup JSON files currently stored in the connected local folder.
+   * Lists Arvi backup JSON files currently stored in the dedicated subfolder
+   * (plus any legacy backups in the parent folder for backward compatibility).
    */
   async listFolderBackups() {
     if (!this.dirHandle) return [];
@@ -291,29 +320,45 @@ export class BackupManager {
     if (perm !== 'granted') return [];
 
     const files = [];
-    try {
-      for await (const entry of this.dirHandle.values()) {
-        if (entry.kind === 'file' && entry.name.startsWith('arvi-varmuuskopio') && entry.name.endsWith('.json')) {
-          try {
-            const file = await entry.getFile();
-            files.push({
-              name: entry.name,
-              lastModified: file.lastModified,
-              size: file.size,
-              handle: entry
-            });
-          } catch {
-            // Skip unreadable entry
+    const seenNames = new Set();
+
+    const collectFromDir = async (dir, isLegacyParent = false) => {
+      if (!dir || typeof dir.values !== 'function') return;
+      try {
+        for await (const entry of dir.values()) {
+          if (entry.kind === 'file' && entry.name.startsWith('arvi-varmuuskopio') && entry.name.endsWith('.json')) {
+            if (isLegacyParent && seenNames.has(entry.name)) continue;
+            try {
+              const file = await entry.getFile();
+              seenNames.add(entry.name);
+              files.push({
+                name: isLegacyParent ? `${entry.name} (juurikansio)` : entry.name,
+                lastModified: file.lastModified,
+                size: file.size,
+                handle: entry,
+                isLatest: !isLegacyParent && entry.name === LATEST_FILENAME
+              });
+            } catch {
+              // Skip unreadable entry
+            }
           }
         }
+      } catch {
+        // Ignore unreadable dir
       }
-    } catch {
-      return [];
+    };
+
+    const targetDir = await this.resolveTargetDirectory(false);
+    if (targetDir) {
+      await collectFromDir(targetDir, false);
+    }
+    if (targetDir !== this.dirHandle) {
+      await collectFromDir(this.dirHandle, true);
     }
 
     return files.sort((a, b) => {
-      if (a.name === LATEST_FILENAME) return -1;
-      if (b.name === LATEST_FILENAME) return 1;
+      if (a.isLatest) return -1;
+      if (b.isLatest) return 1;
       return b.lastModified - a.lastModified;
     });
   }

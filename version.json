@@ -1,7 +1,8 @@
 {
-  "version": "1.0.4",
+  "version": "1.0.5",
   "releasedAt": "2026-11-25",
   "changelog": [
-    "Työkorttien tilanäyttö uudistettu: tilan nimi näytetään selkeästi ilman laatikkoa ja sen alla kulkee prosessiviiva pisteineen (tukee dynaamisesti 2–8 tilaa; yli 8 tilassa näytetään pelkkä tilan nimi)."
+    "Varmuuskopiot tallennetaan nyt aina omaan Arvi-varmuuskopiot-alikansioon, jotta yleiskansiot eivät täyty tiedostoista.",
+    "Porrastettu säilytysprotokolla: säilyttää uusimman kopion sekä 7 päivittäistä, 4 viikoittaista ja 6 kuukausittaista varmuuskopiota (enintään 18 tiedostoa) ja siivoaa vanhemmat automaattisesti."
   ]
 }
